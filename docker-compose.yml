@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: openclaw_saas_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openclaw_user
+      POSTGRES_PASSWORD: openclaw_dev_password
+      POSTGRES_DB: openclaw_saas
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openclaw_user -d openclaw_saas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - openclaw_internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: openclaw_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://openclaw_user:openclaw_dev_password@postgres:5432/openclaw_saas
+      JWT_SECRET: ad49d3f755fd79b11b21d435482e3f67236d5bb9d7b19f75650f848e120bcdce
+      JWT_EXPIRY: 86400
+      OPENCLAW_IMAGE: openclaw:latest
+      OPENCLAW_NETWORK: openclaw_internal
+      OPENCLAW_PORT: 3000
+      RAZORPAY_KEY_ID: rzp_test_SEpU0ShVSLIxGk
+      RAZORPAY_KEY_SECRET: 6oZmPBzsHurScH7EntTNcoVN
+      RAZORPAY_WEBHOOK_SECRET: 248c10e539867e04ce6524b0ce093c56dab590823543df7c0f6d35753d7791b5
+      RAZORPAY_PLAN_MONTHLY_BASIC: plan_SEpaLM5SfcAXtI
+      PORT: 3000
+      NODE_ENV: development
+      FRONTEND_URL: http://localhost:5173
+      DEFAULT_CPU_LIMIT: 1.0
+      DEFAULT_MEMORY_LIMIT: 512m
+      MAX_WORKSPACES_PER_USER: 3
+      BCRYPT_ROUNDS: 10
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock  # Docker socket for container management (Windows)
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - openclaw_internal
+
+networks:
+  openclaw_internal:
+    external: true
+
+volumes:
+  postgres_data:

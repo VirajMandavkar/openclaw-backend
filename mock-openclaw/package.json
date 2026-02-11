@@ -1,0 +1,12 @@
+{
+  "name": "mock-openclaw",
+  "version": "1.0.0",
+  "description": "Mock OpenClaw API for integration testing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
