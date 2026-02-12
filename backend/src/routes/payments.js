@@ -179,10 +179,16 @@ router.get(
       ? Math.max(0, Math.ceil((new Date(subscription.current_period_end) - new Date()) / (1000 * 60 * 60 * 24)))
       : 0;
 
-    // Business rule: Can create workspace if subscription is active and under limit
-    const canCreateWorkspace =
-      subscription.status === 'active' &&
+    // Business rule: User has valid access if period hasn't expired
+    // Active = paying subscription
+    // Cancelled = user cancelled but paid period hasn't ended yet (they still get access)
+    const hasValidAccess =
+      subscription.current_period_end &&
       subscription.current_period_end > new Date() &&
+      ['active', 'cancelled'].includes(subscription.status);
+
+    const canCreateWorkspace =
+      hasValidAccess &&
       workspaceCount < planInfo.workspace_limit;
 
     // Return clean contract - no Razorpay IDs, no internal DB structure
