@@ -162,16 +162,18 @@ router.get(
       });
     }
 
-    // Return subscription details
+    // Return clean subscription status for frontend
     res.json({
-      id: subscription.id,
       status: subscription.status,
-      plan_id: subscription.plan_id,
+      plan: subscription.plan_id,
       current_period_start: subscription.current_period_start,
       current_period_end: subscription.current_period_end,
-      razorpay_subscription_id: subscription.razorpay_subscription_id,
-      created_at: subscription.created_at,
-      cancelled_at: subscription.cancelled_at || null,
+      workspace_limit: 5, // Based on plan (hardcoded for MVP)
+      cancelled_at: subscription.cancelled_at,
+      is_active: subscription.status === 'active',
+      days_remaining: subscription.current_period_end
+        ? Math.ceil((new Date(subscription.current_period_end) - new Date()) / (1000 * 60 * 60 * 24))
+        : 0,
     });
   })
 );
