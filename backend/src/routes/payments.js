@@ -161,6 +161,7 @@ router.get(
       return res.json({
         has_subscription: false,
         status: 'none',
+        can_create_workspace: false,
       });
     }
 
@@ -178,6 +179,12 @@ router.get(
       ? Math.max(0, Math.ceil((new Date(subscription.current_period_end) - new Date()) / (1000 * 60 * 60 * 24)))
       : 0;
 
+    // Business rule: Can create workspace if subscription is active and under limit
+    const canCreateWorkspace =
+      subscription.status === 'active' &&
+      subscription.current_period_end > new Date() &&
+      workspaceCount < planInfo.workspace_limit;
+
     // Return clean contract - no Razorpay IDs, no internal DB structure
     res.json({
       has_subscription: true,
@@ -193,6 +200,7 @@ router.get(
       workspaces_used: workspaceCount,
       days_remaining: daysRemaining,
       cancelled_at: subscription.cancelled_at || null,
+      can_create_workspace: canCreateWorkspace,
     });
   })
 );
