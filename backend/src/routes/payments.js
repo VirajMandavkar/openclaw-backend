@@ -19,6 +19,7 @@ const containerManager = require('../services/containerManager');
 const workspaceModel = require('../models/workspace');
 const logger = require('../utils/logger');
 const db = require('../config/database');
+const { getPlanMetadata, getDefaultPlan } = require('../config/plans');
 
 const router = express.Router();
 
@@ -142,10 +143,10 @@ router.post(
 
 /**
  * GET /api/payments/subscription
- * Get current user's subscription details
+ * Get current user's subscription details with clean contract
  *
  * Auth: Requires JWT
- * Output: Subscription object or 404
+ * Output: Clean subscription object (never 404, returns has_subscription: false instead)
  */
 router.get(
   '/subscription',
@@ -155,25 +156,43 @@ router.get(
 
     const subscription = await subscriptionModel.findByUserId(userId);
 
+    // User has no subscription - return clean "none" state
     if (!subscription) {
-      return res.status(404).json({
-        error: 'No subscription',
-        message: 'You do not have a subscription yet',
+      return res.json({
+        has_subscription: false,
+        status: 'none',
       });
     }
 
-    // Return clean subscription status for frontend
+    // Get plan metadata from registry (hides Razorpay plan ID)
+    const planMetadata = getPlanMetadata(subscription.plan_id);
+
+    // Fallback if plan not found in registry (should never happen in production)
+    const planInfo = planMetadata || getDefaultPlan();
+
+    // Get workspace count for this user
+    const workspaceCount = await workspaceModel.countByUserId(userId);
+
+    // Calculate days remaining
+    const daysRemaining = subscription.current_period_end
+      ? Math.max(0, Math.ceil((new Date(subscription.current_period_end) - new Date()) / (1000 * 60 * 60 * 24)))
+      : 0;
+
+    // Return clean contract - no Razorpay IDs, no internal DB structure
     res.json({
+      has_subscription: true,
       status: subscription.status,
-      plan: subscription.plan_id,
-      current_period_start: subscription.current_period_start,
-      current_period_end: subscription.current_period_end,
-      workspace_limit: 5, // Based on plan (hardcoded for MVP)
-      cancelled_at: subscription.cancelled_at,
-      is_active: subscription.status === 'active',
-      days_remaining: subscription.current_period_end
-        ? Math.ceil((new Date(subscription.current_period_end) - new Date()) / (1000 * 60 * 60 * 24))
-        : 0,
+      plan: {
+        name: planInfo.name,
+        interval: planInfo.interval,
+        price: planInfo.price,
+        currency: planInfo.currency,
+      },
+      period_end: subscription.current_period_end,
+      workspace_limit: planInfo.workspace_limit,
+      workspaces_used: workspaceCount,
+      days_remaining: daysRemaining,
+      cancelled_at: subscription.cancelled_at || null,
     });
   })
 );
